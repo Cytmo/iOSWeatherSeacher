@@ -8,7 +8,8 @@
 #import <UIKit/UIKit.h>
 
 @interface ViewController : UIViewController
-
+@property (nonatomic, strong) UITextField *searchTextField;
+@property (nonatomic, strong) UIButton *searchButton;
 
 @end
 
