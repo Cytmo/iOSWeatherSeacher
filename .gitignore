@@ -115,4 +115,8 @@ Thumbs.db
 # 编译产物
 *.o
 *.a
-*.dylib 
+*.dylib
+
+# API密钥文件
+gaodeMapApiKey*
+config/gaodeMapApiKey* 

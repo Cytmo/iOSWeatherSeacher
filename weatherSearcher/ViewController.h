@@ -10,6 +10,8 @@
 @interface ViewController : UIViewController
 @property (nonatomic, strong) UITextField *searchTextField;
 @property (nonatomic, strong) UIButton *searchButton;
+@property (nonatomic, strong) UIView *weatherView;
+@property (nonatomic, strong) NSString *apiKey;
 
 @end
 
