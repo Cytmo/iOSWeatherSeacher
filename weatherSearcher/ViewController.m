@@ -11,24 +11,24 @@
 // 不需要相对路径，因为iOS Bundle会将所有资源文件扁平化存储
 NSString *const API_KEY_PATH = @"gaodeMapApiKey";
 
-// 天气应用错误代码枚举
+// 错误代码枚举
 typedef NS_ENUM(NSInteger, WeatherErrorCode) {
-    // API相关错误
+    // API
     WeatherErrorCodeAPIKeyEmpty = 1001,    // API密钥为空
     WeatherErrorCodeAPIKeyNotFound = 1002, // 无法找到API密钥文件
 
-    // 城市搜索相关错误
+    // adcode
     WeatherErrorCodeCityNameEmpty = 2001,    // 城市名称不能为空
     WeatherErrorCodeCityNotSupported = 2002, // 仅支持省级及以下行政区划的查询
     WeatherErrorCodeCityNotFound = 2003,     // 未找到该城市
     WeatherErrorCodeAdcodeNotFound = 2004,   // 未获取到adcode
 
-    // 网络相关错误
+    // 网络
     WeatherErrorCodeNetworkNoData = 3001,    // 未收到数据
     WeatherErrorCodeNetworkFailure = 3002,   // 网络请求失败
     WeatherErrorCodeDataParsingError = 3003, // 数据解析错误
 
-    // 天气数据相关错误
+    // 天气 api
     WeatherErrorCodeWeatherDataEmpty = 4001,  // 暂无天气数据
     WeatherErrorCodeWeatherAPIFailure = 4002, // 获取天气信息失败
 };
@@ -134,7 +134,7 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     NSLog(@"API密钥文件路径: %@", keyPath);
 
     if (!keyPath) {
-        NSLog(@"错误: 无法找到API密钥文件，请确保gaodeMapApiKey.txt已添加到项目Bundle Resources中");
+        NSLog(@"错误: 无法找到API密钥文件");
         return;
     }
 
@@ -162,7 +162,10 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 - (void)getAdcodeForCity:(NSString *)cityName
               completion:(void (^)(NSString *adcode, NSError *error))completion {
     if (!cityName || cityName.length == 0) {
-        NSError *error = [NSError errorWithDomain:@"WeatherSearcher" code:WeatherErrorCodeCityNameEmpty userInfo:@{NSLocalizedDescriptionKey: @"城市名称不能为空"}];
+        NSError *error =
+            [NSError errorWithDomain:@"WeatherSearcher"
+                                code:WeatherErrorCodeCityNameEmpty
+                            userInfo:@{NSLocalizedDescriptionKey : @"城市名称不能为空"}];
         completion(nil, error);
         return;
     }
@@ -171,7 +174,10 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     // api直接输入adcode也可以查询，但直接输入100000/中国/中，其格式与其他输入不同，为了规避该问题，禁止用户输入中国或100000
     if ([cityName isEqualToString:@"中国"] || [cityName isEqualToString:@"100000"] ||
         [cityName isEqualToString:@"中"]) {
-        NSError *error = [NSError errorWithDomain:@"WeatherSearcher" code:WeatherErrorCodeCityNotSupported userInfo:@{NSLocalizedDescriptionKey: @"仅支持省级及以下行政区划的查询"}];
+        NSError *error = [NSError
+            errorWithDomain:@"WeatherSearcher"
+                       code:WeatherErrorCodeCityNotSupported
+                   userInfo:@{NSLocalizedDescriptionKey : @"仅支持省级及以下行政区划的查询"}];
         completion(nil, error);
         return;
     }
@@ -196,7 +202,10 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
               }
 
               if (!data) {
-                  NSError *noDataError = [NSError errorWithDomain:@"WeatherSearcher" code:WeatherErrorCodeNetworkNoData userInfo:@{NSLocalizedDescriptionKey: @"未收到数据"}];
+                  NSError *noDataError =
+                      [NSError errorWithDomain:@"WeatherSearcher"
+                                          code:WeatherErrorCodeNetworkNoData
+                                      userInfo:@{NSLocalizedDescriptionKey : @"未收到数据"}];
                   completion(nil, noDataError);
                   return;
               }
@@ -213,7 +222,10 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
               // 获取districts数组
               NSArray *districts = jsonResponse[@"districts"];
               if (!districts || districts.count == 0) {
-                  NSError *notFoundError = [NSError errorWithDomain:@"WeatherSearcher" code:WeatherErrorCodeCityNotFound userInfo:@{NSLocalizedDescriptionKey: @"未找到该城市"}];
+                  NSError *notFoundError =
+                      [NSError errorWithDomain:@"WeatherSearcher"
+                                          code:WeatherErrorCodeCityNotFound
+                                      userInfo:@{NSLocalizedDescriptionKey : @"未找到该城市"}];
                   completion(nil, notFoundError);
                   return;
               }
@@ -223,7 +235,10 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
               NSString *adcode = firstDistrict[@"adcode"];
 
               if (!adcode) {
-                  NSError *noAdcodeError = [NSError errorWithDomain:@"WeatherSearcher" code:WeatherErrorCodeAdcodeNotFound userInfo:@{NSLocalizedDescriptionKey: @"未获取到adcode"}];
+                  NSError *noAdcodeError =
+                      [NSError errorWithDomain:@"WeatherSearcher"
+                                          code:WeatherErrorCodeAdcodeNotFound
+                                      userInfo:@{NSLocalizedDescriptionKey : @"未获取到adcode"}];
                   completion(nil, noAdcodeError);
                   return;
               }
