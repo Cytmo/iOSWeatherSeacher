@@ -363,14 +363,14 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                                             message:message
                                      preferredStyle:UIAlertControllerStyleAlert];
 
-    // 添加"确定"按钮
+    // "确定"
     UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"好的"
                                                        style:UIAlertActionStyleDefault
                                                      handler:^(UIAlertAction *_Nonnull action) {
                                                          NSLog(@"用户查看了天气信息");
                                                      }];
 
-    // 添加"刷新"按钮
+    // "刷新" 
     UIAlertAction *refreshAction =
         [UIAlertAction actionWithTitle:@"刷新"
                                  style:UIAlertActionStyleDefault
@@ -382,9 +382,17 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                                        [self searchButtonTapped:self.searchButton];
                                    }
                                }];
+    // UIAlertAction *testAction = [
+    //     UIAlertAction actionWithTitle:@"test"
+    //     style:UIAlertActionStyleDefault
+    //     handler:^(UIAlertAction *_Nonnull action){
+    //         NSLog(@"test action tapped");
+    //     }
+    // ];
 
     [alert addAction:okAction];
     [alert addAction:refreshAction];
+    // [alert addAction:testAction];
 
     // 在主线程中显示alert
     [self presentViewController:alert
