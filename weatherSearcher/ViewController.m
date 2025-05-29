@@ -6,8 +6,80 @@
 //
 
 #import "ViewController.h"
-// 不需要路径，因为iOS Bundle会将所有资源文件扁平化存储
+#import <Foundation/Foundation.h>
+
+// 天气应用错误域
+NSString *const WeatherSearcherErrorDomain = @"com.ks.weatherSearcher.error";
+// 不需要相对路径，因为iOS Bundle会将所有资源文件扁平化存储
 NSString *const API_KEY_PATH = @"gaodeMapApiKey";
+// 天气应用错误代码枚举
+typedef NS_ENUM(NSInteger, WeatherErrorCode) {
+    // API相关错误
+    WeatherErrorCodeAPIKeyEmpty = 1001,          // API密钥为空
+    WeatherErrorCodeAPIKeyNotFound = 1002,       // 无法找到API密钥文件
+    
+    // 城市搜索相关错误
+    WeatherErrorCodeCityNameEmpty = 2001,        // 城市名称不能为空
+    WeatherErrorCodeCityNotSupported = 2002,     // 仅支持省级及以下行政区划的查询
+    WeatherErrorCodeCityNotFound = 2003,         // 未找到该城市
+    WeatherErrorCodeAdcodeNotFound = 2004,       // 未获取到adcode
+    
+    // 网络相关错误
+    WeatherErrorCodeNetworkNoData = 3001,        // 未收到数据
+    WeatherErrorCodeNetworkFailure = 3002,       // 网络请求失败
+    WeatherErrorCodeDataParsingError = 3003,     // 数据解析错误
+    
+    // 天气数据相关错误
+    WeatherErrorCodeWeatherDataEmpty = 4001,     // 暂无天气数据
+    WeatherErrorCodeWeatherAPIFailure = 4002,    // 获取天气信息失败
+};
+
+// 错误代码描述映射函数
+NSString *WeatherErrorDescription(WeatherErrorCode errorCode) {
+    switch (errorCode) {
+        // API相关错误
+        case WeatherErrorCodeAPIKeyEmpty:
+            return @"API密钥为空";
+        case WeatherErrorCodeAPIKeyNotFound:
+            return @"无法找到API密钥文件，请确保gaodeMapApiKey.txt已添加到项目Bundle Resources中";
+            
+        // 城市搜索相关错误
+        case WeatherErrorCodeCityNameEmpty:
+            return @"城市名称不能为空";
+        case WeatherErrorCodeCityNotSupported:
+            return @"仅支持省级及以下行政区划的查询";
+        case WeatherErrorCodeCityNotFound:
+            return @"未找到该城市";
+        case WeatherErrorCodeAdcodeNotFound:
+            return @"未获取到adcode";
+            
+        // 网络相关错误
+        case WeatherErrorCodeNetworkNoData:
+            return @"未收到数据";
+        case WeatherErrorCodeNetworkFailure:
+            return @"网络请求失败";
+        case WeatherErrorCodeDataParsingError:
+            return @"数据解析错误";
+            
+        // 天气数据相关错误
+        case WeatherErrorCodeWeatherDataEmpty:
+            return @"暂无天气数据";
+        case WeatherErrorCodeWeatherAPIFailure:
+            return @"获取天气信息失败";
+            
+        default:
+            return @"未知错误";
+    }
+}
+
+// 创建错误对象
+NSError *WeatherError(WeatherErrorCode errorCode) {
+    return [NSError errorWithDomain:WeatherSearcherErrorDomain 
+                               code:errorCode 
+                           userInfo:@{NSLocalizedDescriptionKey: WeatherErrorDescription(errorCode)}];
+}
+
+
 @interface ViewController ()
 
 @end
@@ -47,6 +119,7 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
     self.weatherView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.weatherView];
 }
+
 - (void)setupConstraints {
     [NSLayoutConstraint activateConstraints:@[
         // 搜索框约束
@@ -61,7 +134,13 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
         [self.searchButton.topAnchor constraintEqualToAnchor:self.searchTextField.bottomAnchor constant:20],
         [self.searchButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:40],
         [self.searchButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-40],
-        [self.searchButton.heightAnchor constraintEqualToConstant:44]
+        [self.searchButton.heightAnchor constraintEqualToConstant:44],
+
+        // weatherview约束
+        [self.weatherView.centerXAnchor constraintEqualToAnchor: self.view.centerXAnchor ],
+        [self.weatherView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:100],
+        [self.weatherView.heightAnchor constraintEqualToConstant:88],
+        [self.weatherView.widthAnchor constraintEqualToConstant:200],
     ]];
 }
 
@@ -71,7 +150,7 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
     NSLog(@"API密钥文件路径: %@", keyPath);
     
     if (!keyPath) {
-        NSLog(@"错误: 无法找到API密钥文件，请确保gaodeMapApiKey.txt已添加到项目Bundle Resources中");
+        NSLog(@"错误: %@", WeatherError(WeatherErrorCodeAPIKeyNotFound));
         return;
     }
     
@@ -85,10 +164,9 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
     
     key = [key stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     
+    
     if (!key || key.length == 0) {
-        NSError *error = [NSError errorWithDomain:@"APIKeyError" 
-                                             code:1002 
-                                         userInfo:@{NSLocalizedDescriptionKey: @"API密钥为空"}];
+        NSError *error = WeatherError(WeatherErrorCodeAPIKeyEmpty);
         NSLog(@"错误: %@", error.localizedDescription);
         return;
     } else {
@@ -99,18 +177,14 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
 
 - (void)getAdcodeForCity:(NSString *)cityName completion:(void (^)(NSString *adcode, NSError *error))completion {
     if (!cityName || cityName.length == 0) {
-        NSError *error = [NSError errorWithDomain:@"CitySearchError" 
-                                             code:1001 
-                                         userInfo:@{NSLocalizedDescriptionKey: @"城市名称不能为空"}];
+        NSError *error = WeatherError(WeatherErrorCodeCityNameEmpty);
         completion(nil, error);
         return;
     }
     
     // adcode api直接输入adcode也可以查询，但直接输入100000/中国/中，其格式与其他输入不同，为了规避该问题，禁止用户输入中国或100000
     if([cityName isEqualToString:@"中国"] || [cityName isEqualToString:@"100000"] || [cityName isEqualToString:@"中"]){
-        NSError *error = [NSError errorWithDomain:@"CitySearchError" 
-                                             code:1001 
-                                         userInfo:@{NSLocalizedDescriptionKey: @"仅支持省级及以下行政区划的查询"}];
+        NSError *error = WeatherError(WeatherErrorCodeCityNotSupported);
         completion(nil, error);
         return;
     }
@@ -129,9 +203,7 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
         }
         
         if (!data) {
-            NSError *noDataError = [NSError errorWithDomain:@"NetworkError" 
-                                                       code:1003 
-                                                   userInfo:@{NSLocalizedDescriptionKey: @"未收到数据"}];
+            NSError *noDataError = WeatherError(WeatherErrorCodeNetworkNoData);
             completion(nil, noDataError);
             return;
         }
@@ -146,9 +218,7 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
         // 获取districts数组
         NSArray *districts = jsonResponse[@"districts"];
         if (!districts || districts.count == 0) {
-            NSError *notFoundError = [NSError errorWithDomain:@"CityNotFoundError" 
-                                                         code:1005 
-                                                     userInfo:@{NSLocalizedDescriptionKey: @"未找到该城市"}];
+            NSError *notFoundError = WeatherError(WeatherErrorCodeCityNotFound);
             completion(nil, notFoundError);
             return;
         }
@@ -158,9 +228,7 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
         NSString *adcode = firstDistrict[@"adcode"];
         
         if (!adcode) {
-            NSError *noAdcodeError = [NSError errorWithDomain:@"AdcodeError" 
-                                                         code:1006 
-                                                     userInfo:@{NSLocalizedDescriptionKey: @"未获取到adcode"}];
+            NSError *noAdcodeError = WeatherError(WeatherErrorCodeAdcodeNotFound);
             completion(nil, noAdcodeError);
             return;
         }
@@ -197,7 +265,8 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
     
     NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
         if (error) {
-            [self showAlert:@"网络错误" message:error.localizedDescription];
+            NSError *networkError = WeatherError(WeatherErrorCodeNetworkFailure);
+            [self showAlert:@"网络错误" message:networkError.localizedDescription];
             return;
         }
         
@@ -205,7 +274,8 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
             NSError *jsonError;
             NSDictionary *jsonResponse = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
             if (jsonError) {
-                [self showAlert:@"数据解析错误" message:jsonError.localizedDescription];
+                NSError *parseError = WeatherError(WeatherErrorCodeDataParsingError);
+                [self showAlert:@"数据解析错误" message:parseError.localizedDescription];
                 return;
             }
             
@@ -224,14 +294,16 @@ NSString *const API_KEY_PATH = @"gaodeMapApiKey";
     // 检查API返回状态
     NSInteger statusCode = [jsonResponse[@"status"] integerValue];
     if(statusCode != 1){
-        [self showAlert:@"错误" message:@"获取天气信息失败"];
+        NSError *apiError = WeatherError(WeatherErrorCodeWeatherAPIFailure);
+        [self showAlert:@"错误" message:apiError.localizedDescription];
         return;
     }
     
     // 解析天气数据
     NSArray *lives = jsonResponse[@"lives"];
     if (!lives || lives.count == 0) {
-        [self showAlert:@"错误" message:@"暂无天气数据"];
+        NSError *dataError = WeatherError(WeatherErrorCodeWeatherDataEmpty);
+        [self showAlert:@"错误" message:dataError.localizedDescription];
         return;
     }
     
