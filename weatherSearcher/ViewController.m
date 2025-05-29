@@ -422,6 +422,22 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     self.humidityLabel.text = [NSString stringWithFormat:@"湿度: %@%%", humidity];
     self.updateTimeLabel.text = [NSString stringWithFormat:@"更新时间: %@", reportTime];
 
+
+    /*
+    // 显示动画（正确方式）
+    self.weatherView.hidden = NO;           // 先设置为显示
+    self.weatherView.alpha = 0.0;           // 但是透明
+    [UIView animateWithDuration:0.3 animations:^{
+        self.weatherView.alpha = 1.0;       // 动画到不透明
+    }];
+
+    // 隐藏动画（正确方式）
+    [UIView animateWithDuration:0.3 animations:^{
+        self.weatherView.alpha = 0.0;       // 动画到透明
+    } completion:^(BOOL finished) {
+        self.weatherView.hidden = YES;      // 动画结束后真正隐藏
+    }];
+    */
     // 显示天气卡片
     if (self.weatherView.hidden) {
         self.weatherView.hidden = NO;
