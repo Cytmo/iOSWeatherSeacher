@@ -12,5 +12,5 @@
 @property (nonatomic, strong) UIButton *searchButton;
 @property (nonatomic, strong) UIView *weatherView;
 @property (nonatomic, strong) NSString *apiKey;
-
+@property (nonatomic, strong) UIActivityIndicatorView *loadingIndicator;
 @end

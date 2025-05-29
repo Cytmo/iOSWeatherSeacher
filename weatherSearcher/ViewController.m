@@ -120,6 +120,12 @@ NSError *WeatherError(WeatherErrorCode errorCode) {
     self.weatherView.layer.cornerRadius = 8;
     self.weatherView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.weatherView];
+
+    // 在网络请求过程中显示的加载指示器
+    self.loadingIndicator = [[UIActivityIndicatorView alloc] init];
+    self.loadingIndicator.translatesAutoresizingMaskIntoConstraints = NO;
+    self.loadingIndicator.hidesWhenStopped = YES;
+    [self.view addSubview:self.loadingIndicator];
 }
 
 - (void)setupConstraints {
@@ -144,22 +150,37 @@ NSError *WeatherError(WeatherErrorCode errorCode) {
                                                          constant:-40],
         [self.searchButton.heightAnchor constraintEqualToConstant:44],
 
+        // 加载约束
+        [self.loadingIndicator.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.loadingIndicator.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+
         // weatherview约束
-        [self.weatherView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.weatherView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor
+                                                       constant:200],
         [self.weatherView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor
-                                                       constant:100],
+                                                       constant:1100],
         [self.weatherView.heightAnchor constraintEqualToConstant:88],
-        [self.weatherView.widthAnchor constraintEqualToConstant:200],
+        [self.weatherView.widthAnchor constraintEqualToConstant:100],
+
     ]];
+}
+
+- (void)showLoading {
+    self.searchButton.enabled = NO;
+    [self.loadingIndicator startAnimating];
+}
+
+- (void)hideLoading {
+    self.searchButton.enabled = YES;
+    [self.loadingIndicator stopAnimating];
 }
 
 - (void)readApiKey {
     NSString *keyPath = [[NSBundle mainBundle] pathForResource:API_KEY_PATH ofType:@"txt"];
 
     NSLog(@"API密钥文件路径: %@", keyPath);
-    s
 
-        if (!keyPath) {
+    if (!keyPath) {
         NSLog(@"错误: %@", WeatherError(WeatherErrorCodeAPIKeyNotFound));
         return;
     }
@@ -411,6 +432,11 @@ NSError *WeatherError(WeatherErrorCode errorCode) {
 }
 
 - (void)searchButtonTapped:(UIButton *)sender {
+    // 不能使用gcd在主线程显示加载，似乎会导致用户可以多次触发搜索
+    // 并非gcd导致
+    // 原因未知
+    self.searchButton.enabled = NO;
+    [self showLoading];
     NSString *cityName = self.searchTextField.text;
     NSLog(@"搜索城市: %@", cityName);
     // 使用adcode api找到用户输入的城市对应的adcode
@@ -421,12 +447,19 @@ NSError *WeatherError(WeatherErrorCode errorCode) {
                         dispatch_async(dispatch_get_main_queue(), ^{
                             [self showAlert:@"错误" message:error.localizedDescription];
                         });
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [self hideLoading];
+                        });
+
                         return;
                     }
                     NSLog(@"adcode: %@", adcode);
                     // 使用adcode获取天气信息
                     // 实际上高德天气API可以接受非adcode的city name 但并未在文档中找到相关说明
                     [self fetchWeatherWithAdcode:adcode];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self hideLoading];
+                    });
                 }];
 }
 @end
