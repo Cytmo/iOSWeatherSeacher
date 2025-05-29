@@ -475,51 +475,6 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     }
 }
 
-- (void)showWeatherAlert:(NSString *)title message:(NSString *)message {
-    UIAlertController *alert =
-        [UIAlertController alertControllerWithTitle:title
-                                            message:message
-                                     preferredStyle:UIAlertControllerStyleAlert];
-
-    // "确定"
-    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"好的"
-                                                       style:UIAlertActionStyleDefault
-                                                     handler:^(UIAlertAction *_Nonnull action) {
-                                                         NSLog(@"用户查看了天气信息");
-                                                     }];
-
-    // "刷新"
-    UIAlertAction *refreshAction =
-        [UIAlertAction actionWithTitle:@"刷新"
-                                 style:UIAlertActionStyleDefault
-                               handler:^(UIAlertAction *_Nonnull action) {
-                                   NSLog(@"用户点击了刷新");
-                                   // 重新搜索当前城市的天气
-                                   NSString *currentCity = self.searchTextField.text;
-                                   if (currentCity && currentCity.length > 0) {
-                                       [self searchButtonTapped:self.searchButton];
-                                   }
-                               }];
-    // UIAlertAction *testAction = [
-    //     UIAlertAction actionWithTitle:@"test"
-    //     style:UIAlertActionStyleDefault
-    //     handler:^(UIAlertAction *_Nonnull action){
-    //         NSLog(@"test action tapped");
-    //     }
-    // ];
-
-    [alert addAction:okAction];
-    [alert addAction:refreshAction];
-    // [alert addAction:testAction];
-
-    // 在主线程中显示alert
-    [self presentViewController:alert
-                       animated:YES
-                     completion:^{
-                         NSLog(@"天气信息alert已显示");
-                     }];
-}
-
 - (void)searchButtonTapped:(UIButton *)sender {
     // 不能使用gcd在主线程显示加载，似乎会导致用户可以多次触发搜索
     // 并非gcd导致
@@ -606,5 +561,21 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 - (void)weatherCardTapped:(UITapGestureRecognizer *)gesture {
     // 点击卡片时显示详细信息的 Alert
     NSLog(@"weatherCardTapped");
+    [UIView animateWithDuration:0.2 animations:^{
+                // 由大变小，强调已经有了结果
+                self.weatherView.transform = CGAffineTransformMakeScale(1.05, 1.05);
+        
+    }
+     /*^(BOOL finished) {
+      [UIView animateWithDuration:0.6
+                       animations:^{
+                           self.weatherView.transform = CGAffineTransformIdentity;
+                       }];
+  }];*/
+                     completion:^(BOOL finished){
+        [UIView animateWithDuration:0.1 animations:^{
+            self.weatherView.transform = CGAffineTransformIdentity;
+        }];
+    }];
 }
 @end
