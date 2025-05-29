@@ -1,0 +1,1 @@
+clang-format -i $(find . -name "*.m" -o -name "*.h")

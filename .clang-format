@@ -1,0 +1,70 @@
+# 快手iOS编码规范 2024-V1.0适配的.clang-format配置
+
+Language: ObjC
+BasedOnStyle: LLVM
+
+# 缩进使用空格，缩进宽度为4
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# 大括号换行风格
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterObjCDeclaration: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+
+# 基础格式化规则
+ColumnLimit: 100
+AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# ObjC 特有配置
+ObjCBlockIndentWidth: 4
+ObjCSpaceAfterProperty: true
+ObjCSpaceBeforeProtocolList: true
+
+# 空格规则
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: true
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# 块参数格式化
+AlignAfterOpenBracket: Align
+AlignTrailingComments: true
+
+# 方法调用格式化
+BinPackArguments: false
+BinPackParameters: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: true
+
+# 保持终行
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+
+# 指针和引用的格式
+PointerAlignment: Right
+
+# 扩展名规定的设置
+SortIncludes: false
+ReflowComments: true
