@@ -6,6 +6,7 @@
 //
 
 #import "ViewController.h"
+#include <Foundation/NSObjCRuntime.h>
 #import <Foundation/Foundation.h>
 
 // 不需要相对路径，因为iOS Bundle会将所有资源文件扁平化存储
@@ -61,18 +62,27 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                           action:@selector(searchButtonTapped:)
                 forControlEvents:UIControlEventTouchUpInside];
     [self.searchButton setTitle:@"搜索" forState:UIControlStateNormal];
-    self.searchButton.backgroundColor = [UIColor systemBlueColor];
+    self.searchButton.backgroundColor = [UIColor systemCyanColor];
     [self.searchButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.searchButton.layer.cornerRadius = 8;
     self.searchButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.searchButton];
 
-    // 测试auto layout， 添加一个weatherview
+    // 创建天气卡片view
     self.weatherView = [[UIView alloc] init];
-    self.weatherView.backgroundColor = [UIColor systemBlueColor];
-    self.weatherView.layer.cornerRadius = 8;
+    self.weatherView.backgroundColor = [UIColor systemCyanColor];
+    self.weatherView.layer.cornerRadius = 12;
     self.weatherView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.weatherView.hidden = YES; // 有数据时才显示
     [self.view addSubview:self.weatherView];
+
+    // 创建天气信息标签
+    [self setupWeatherLabels];
+
+    // 给天气卡片添加点击手势
+    UITapGestureRecognizer *tapGesture =
+        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(weatherCardTapped:)];
+    [self.weatherView addGestureRecognizer:tapGesture];
 
     // 在网络请求过程中显示的加载指示器
     self.loadingIndicator = [[UIActivityIndicatorView alloc] init];
@@ -107,14 +117,60 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
         [self.loadingIndicator.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.loadingIndicator.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
 
-        // weatherview约束
-        [self.weatherView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor
-                                                       constant:200],
-        [self.weatherView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor
-                                                       constant:1100],
-        [self.weatherView.heightAnchor constraintEqualToConstant:88],
-        [self.weatherView.widthAnchor constraintEqualToConstant:100],
+        /*
+        centerXAnchor     // 水平
+        topAnchor         // 相对顶部位置
+        leadingAnchor     // 左边距
+        trailingAnchor    // 右边距
+        heightAnchor      // 高度
+        */
+        // 天气卡片约束
+        [self.weatherView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.weatherView.topAnchor constraintEqualToAnchor:self.searchButton.bottomAnchor
+                                                   constant:30],
+        [self.weatherView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor
+                                                       constant:40],
+        [self.weatherView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor
+                                                        constant:-40],
+        [self.weatherView.heightAnchor constraintEqualToConstant:200],
 
+        // 天气卡片内部标签约束 UILabel会根据内容自动计算宽高
+        [self.locationLabel.topAnchor constraintEqualToAnchor:self.weatherView.topAnchor
+                                                     constant:16],
+        [self.locationLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor
+                                                         constant:16],
+        [self.locationLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor
+                                                          constant:-16],
+
+        [self.temperatureLabel.topAnchor constraintEqualToAnchor:self.locationLabel.bottomAnchor
+                                                        constant:8],
+        [self.temperatureLabel.centerXAnchor
+            constraintEqualToAnchor:self.weatherView.centerXAnchor],
+
+        [self.weatherLabel.topAnchor constraintEqualToAnchor:self.temperatureLabel.bottomAnchor
+                                                    constant:4],
+        [self.weatherLabel.centerXAnchor constraintEqualToAnchor:self.weatherView.centerXAnchor],
+
+        [self.windLabel.topAnchor constraintEqualToAnchor:self.weatherLabel.bottomAnchor
+                                                 constant:12],
+        [self.windLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor
+                                                     constant:16],
+        [self.windLabel.widthAnchor constraintEqualToAnchor:self.weatherView.widthAnchor
+                                                 multiplier:0.45],
+
+        [self.humidityLabel.topAnchor constraintEqualToAnchor:self.weatherLabel.bottomAnchor
+                                                     constant:12],
+        [self.humidityLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor
+                                                          constant:-16],
+        [self.humidityLabel.widthAnchor constraintEqualToAnchor:self.weatherView.widthAnchor
+                                                     multiplier:0.45],
+
+        [self.updateTimeLabel.bottomAnchor constraintEqualToAnchor:self.weatherView.bottomAnchor
+                                                          constant:-12],
+        [self.updateTimeLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor
+                                                           constant:16],
+        [self.updateTimeLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor
+                                                            constant:-16],
     ]];
 }
 
@@ -338,23 +394,69 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     NSString *humidity = weatherInfo[@"humidity"] ?: @"--";
     NSString *reportTime = weatherInfo[@"reporttime"] ?: @"--";
 
-    NSString *title = [NSString stringWithFormat:@"%@·%@·%@", province, city, weather];
-    NSString *message = [NSString stringWithFormat:@"位置：%@·%@\n"
-                                                   @"温度：%@°C\n"
-                                                   @"天气：%@\n"
-                                                   @"风向：%@ %@级\n"
-                                                   @"湿度：%@%%\n"
-                                                   @"更新时间：%@",
-                                                   province,
-                                                   city,
-                                                   temperature,
-                                                   weather,
-                                                   windDirection,
-                                                   windPower,
-                                                   humidity,
-                                                   reportTime];
+    // 更新卡片内容
+    [self updateWeatherCard:province
+                       city:city
+                    weather:weather
+                temperature:temperature
+              windDirection:windDirection
+                  windPower:windPower
+                   humidity:humidity
+                 reportTime:reportTime];
+}
 
-    [self showWeatherAlert:title message:message];
+// 更新天气卡片
+- (void)updateWeatherCard:(NSString *)province
+                     city:(NSString *)city
+                  weather:(NSString *)weather
+              temperature:(NSString *)temperature
+            windDirection:(NSString *)windDirection
+                windPower:(NSString *)windPower
+                 humidity:(NSString *)humidity
+               reportTime:(NSString *)reportTime {
+    // 更新标签内容
+    self.locationLabel.text = [NSString stringWithFormat:@"%@ · %@", province, city];
+    self.temperatureLabel.text = [NSString stringWithFormat:@"%@°", temperature];
+    self.weatherLabel.text = weather;
+    self.windLabel.text = [NSString stringWithFormat:@"风向: %@ %@级", windDirection, windPower];
+    self.humidityLabel.text = [NSString stringWithFormat:@"湿度: %@%%", humidity];
+    self.updateTimeLabel.text = [NSString stringWithFormat:@"更新时间: %@", reportTime];
+
+    // 显示天气卡片
+    if (self.weatherView.hidden) {
+        self.weatherView.hidden = NO;
+        self.weatherView.alpha = 0.0;
+        // 缩小到80，方便由小到大的动画效果
+        self.weatherView.transform = CGAffineTransformMakeScale(0.8, 0.8);
+
+        // 从小到大的动画
+        [UIView animateWithDuration:0.8
+                              delay:0.0
+             usingSpringWithDamping:2
+              initialSpringVelocity:0.1
+                            // 淡入淡出
+                            options:UIViewAnimationOptionCurveEaseInOut
+
+                         animations:^{
+                             self.weatherView.alpha = 1.0;
+                             // 恢复到原始大小
+                             self.weatherView.transform = CGAffineTransformIdentity;
+                         }
+                         completion:nil];
+    } else {
+        // 如果已经显示，添加轻微的动画
+        [UIView animateWithDuration:0.2
+            animations:^{
+                // 由大变小，强调已经有了结果
+                self.weatherView.transform = CGAffineTransformMakeScale(1.2, 1.2);
+            }
+            completion:^(BOOL finished) {
+                [UIView animateWithDuration:0.6
+                                 animations:^{
+                                     self.weatherView.transform = CGAffineTransformIdentity;
+                                 }];
+            }];
+    }
 }
 
 - (void)showWeatherAlert:(NSString *)title message:(NSString *)message {
@@ -370,7 +472,7 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                                                          NSLog(@"用户查看了天气信息");
                                                      }];
 
-    // "刷新" 
+    // "刷新"
     UIAlertAction *refreshAction =
         [UIAlertAction actionWithTitle:@"刷新"
                                  style:UIAlertActionStyleDefault
@@ -432,5 +534,61 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                         [self hideLoading];
                     });
                 }];
+}
+
+- (void)setupWeatherLabels {
+    // 地点
+    self.locationLabel = [[UILabel alloc] init];
+    self.locationLabel.font = [UIFont boldSystemFontOfSize:18];
+    self.locationLabel.textColor = [UIColor whiteColor];
+    self.locationLabel.textAlignment = NSTextAlignmentCenter;
+    self.locationLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.weatherView addSubview:self.locationLabel];
+
+    // 气温
+    self.temperatureLabel = [[UILabel alloc] init];
+    self.temperatureLabel.font = [UIFont systemFontOfSize:36 weight:UIFontWeightLight];
+    self.temperatureLabel.textColor = [UIColor whiteColor];
+    self.temperatureLabel.textAlignment = NSTextAlignmentCenter;
+    self.temperatureLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.weatherView addSubview:self.temperatureLabel];
+
+    // 天气状况
+    self.weatherLabel = [[UILabel alloc] init];
+    self.weatherLabel.font = [UIFont systemFontOfSize:16];
+    self.weatherLabel.textColor = [UIColor whiteColor];
+    self.weatherLabel.textAlignment = NSTextAlignmentCenter;
+    self.weatherLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.weatherView addSubview:self.weatherLabel];
+
+    // 风向风力
+    self.windLabel = [[UILabel alloc] init];
+    self.windLabel.font = [UIFont systemFontOfSize:14];
+    self.windLabel.textColor = [UIColor whiteColor];
+    self.windLabel.textAlignment = NSTextAlignmentCenter;
+    self.windLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.weatherView addSubview:self.windLabel];
+
+    // 湿度
+    self.humidityLabel = [[UILabel alloc] init];
+    self.humidityLabel.font = [UIFont systemFontOfSize:14];
+    self.humidityLabel.textColor = [UIColor whiteColor];
+    self.humidityLabel.textAlignment = NSTextAlignmentCenter;
+    self.humidityLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.weatherView addSubview:self.humidityLabel];
+
+    // 更新时间
+    self.updateTimeLabel = [[UILabel alloc] init];
+    self.updateTimeLabel.font = [UIFont systemFontOfSize:12];
+    self.updateTimeLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.8];
+    self.updateTimeLabel.textAlignment = NSTextAlignmentCenter;
+    self.updateTimeLabel.numberOfLines = 0;
+    self.updateTimeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.weatherView addSubview:self.updateTimeLabel];
+}
+
+- (void)weatherCardTapped:(UITapGestureRecognizer *)gesture {
+    // 点击卡片时显示详细信息的 Alert
+    NSLog(@"weatherCardTapped");
 }
 @end
