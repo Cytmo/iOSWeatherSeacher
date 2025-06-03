@@ -6,9 +6,9 @@
 //
 
 #import "ViewController.h"
-#include <Foundation/NSObjCRuntime.h>
 #import <Foundation/Foundation.h>
-
+#import <UIKit/UIKit.h>
+#import "WeatherData.h"
 // 不需要相对路径，因为iOS Bundle会将所有资源文件扁平化存储
 NSString *const API_KEY_PATH = @"gaodeMapApiKey";
 
@@ -369,6 +369,11 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 // 显示天气数据
 - (void)displayWeatherData:(NSDictionary *)jsonResponse {
     // 检查API返回状态
+    if (!jsonResponse || ![jsonResponse isKindOfClass:[NSDictionary class]]) {
+        [self showAlert:@"错误" message:@"天气数据格式错误"];
+        return;
+    }
+
     NSInteger statusCode = [jsonResponse[@"status"] integerValue];
     if (statusCode != 1) {
         [self showAlert:@"错误" message:@"获取天气信息失败"];
@@ -377,51 +382,34 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
     // 解析天气数据
     NSArray *lives = jsonResponse[@"lives"];
-    if (!lives || lives.count == 0) {
+    if (![lives isKindOfClass:[NSArray class]] || lives.count == 0) {
         [self showAlert:@"错误" message:@"暂无天气数据"];
         return;
     }
 
     NSDictionary *weatherInfo = lives[0];
-
-    // 提取天气信息
-    NSString *province = weatherInfo[@"province"] ?: @"未知省份";
-    NSString *city = weatherInfo[@"city"] ?: @"未知城市";
-    NSString *weather = weatherInfo[@"weather"] ?: @"未知";
-    NSString *temperature = weatherInfo[@"temperature"] ?: @"--";
-    NSString *windDirection = weatherInfo[@"winddirection"] ?: @"--";
-    NSString *windPower = weatherInfo[@"windpower"] ?: @"--";
-    NSString *humidity = weatherInfo[@"humidity"] ?: @"--";
-    NSString *reportTime = weatherInfo[@"reporttime"] ?: @"--";
-
-    // 更新卡片内容
-    [self updateWeatherCard:province
-                       city:city
-                    weather:weather
-                temperature:temperature
-              windDirection:windDirection
-                  windPower:windPower
-                   humidity:humidity
-                 reportTime:reportTime];
+    if (![weatherInfo isKindOfClass:[NSDictionary class]]) {
+        [self showAlert:@"错误" message:@"天气详情数据格式错误"];
+        return;
+    }
+    NSObject *weatherData = [[WeatherData alloc] initWithDictionary:(NSDictionary *)weatherInfo];
+    if (!weatherData) {
+        [self showAlert:@"错误" message:@"天气数据解析失败"];
+        return;
+    }
+    [self updateWeatherCard:weatherData];
 }
-
 // 更新天气卡片
-- (void)updateWeatherCard:(NSString *)province
-                     city:(NSString *)city
-                  weather:(NSString *)weather
-              temperature:(NSString *)temperature
-            windDirection:(NSString *)windDirection
-                windPower:(NSString *)windPower
-                 humidity:(NSString *)humidity
-               reportTime:(NSString *)reportTime {
+- (void)updateWeatherCard:(WeatherData *)weatherData {
     // 更新标签内容
-    self.locationLabel.text = [NSString stringWithFormat:@"%@ · %@", province, city];
-    self.temperatureLabel.text = [NSString stringWithFormat:@"%@°", temperature];
-    self.weatherLabel.text = weather;
-    self.windLabel.text = [NSString stringWithFormat:@"风向: %@ %@级", windDirection, windPower];
-    self.humidityLabel.text = [NSString stringWithFormat:@"湿度: %@%%", humidity];
-    self.updateTimeLabel.text = [NSString stringWithFormat:@"更新时间: %@", reportTime];
-
+    self.locationLabel.text =
+        [NSString stringWithFormat:@"%@ · %@", weatherData.province, weatherData.city];
+    self.temperatureLabel.text = [NSString stringWithFormat:@"%@°", weatherData.temperature];
+    self.weatherLabel.text = weatherData.weather;
+    self.windLabel.text = [NSString
+        stringWithFormat:@"风向: %@ %@级", weatherData.windDirection, weatherData.windPower];
+    self.humidityLabel.text = [NSString stringWithFormat:@"湿度: %@%%", weatherData.humidity];
+    self.updateTimeLabel.text = [NSString stringWithFormat:@"更新时间: %@", weatherData.reportTime];
 
     /*
     // 显示动画（正确方式）
@@ -561,21 +549,22 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 - (void)weatherCardTapped:(UITapGestureRecognizer *)gesture {
     // 点击卡片时显示详细信息的 Alert
     NSLog(@"weatherCardTapped");
-    [UIView animateWithDuration:0.2 animations:^{
-                // 由大变小，强调已经有了结果
-                self.weatherView.transform = CGAffineTransformMakeScale(1.05, 1.05);
-        
-    }
-     /*^(BOOL finished) {
-      [UIView animateWithDuration:0.6
-                       animations:^{
-                           self.weatherView.transform = CGAffineTransformIdentity;
-                       }];
-  }];*/
-                     completion:^(BOOL finished){
-        [UIView animateWithDuration:0.1 animations:^{
-            self.weatherView.transform = CGAffineTransformIdentity;
+    [UIView animateWithDuration:0.2
+        animations:^{
+            // 由大变小，强调已经有了结果
+            self.weatherView.transform = CGAffineTransformMakeScale(1.05, 1.05);
+        }
+        /*^(BOOL finished) {
+         [UIView animateWithDuration:0.6
+                          animations:^{
+                              self.weatherView.transform = CGAffineTransformIdentity;
+                          }];
+     }];*/
+        completion:^(BOOL finished) {
+            [UIView animateWithDuration:0.1
+                             animations:^{
+                                 self.weatherView.transform = CGAffineTransformIdentity;
+                             }];
         }];
-    }];
 }
 @end
