@@ -65,15 +65,11 @@
 		};
 		346CF6772DE5580E00C6F203 /* weatherSearcherTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = weatherSearcherTests;
 			sourceTree = "<group>";
 		};
 		346CF6812DE5580E00C6F203 /* weatherSearcherUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = weatherSearcherUITests;
 			sourceTree = "<group>";
 		};
@@ -139,7 +135,6 @@
 				CD9A3FD7F3E02E0534ABA202 /* Pods-weatherSearcherTests.debug.xcconfig */,
 				A72F86C394B94706D31ABF34 /* Pods-weatherSearcherTests.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};

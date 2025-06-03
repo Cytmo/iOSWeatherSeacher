@@ -40,6 +40,49 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
 @implementation ViewController
 
+// MARK: - 错误处理相关方法
+
+// 创建自定义错误
+- (NSError *)createErrorWithCode:(WeatherErrorCode)code message:(NSString *)message {
+    return [NSError errorWithDomain:@"WeatherSearcher" 
+                               code:code 
+                           userInfo:@{NSLocalizedDescriptionKey: message}];
+}
+
+// 通用错误显示方法
+- (void)showAlert:(NSString *)title message:(NSString *)message {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
+                                                                       message:message
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        
+        UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"确定"
+                                                           style:UIAlertActionStyleDefault
+                                                         handler:^(UIAlertAction *action) {
+                                                             NSLog(@"用户点击了确定按钮");
+                                                         }];
+        
+        [alert addAction:okAction];
+        [self presentViewController:alert animated:YES completion:nil];
+    });
+}
+
+// 处理网络请求错误
+- (void)handleNetworkError:(NSError *)error {
+    NSString *message = @"网络请求失败";
+    if (error.code == WeatherErrorCodeNetworkNoData) {
+        message = @"未收到数据";
+    }
+    [self showAlert:@"网络错误" message:message];
+}
+
+// 处理数据解析错误
+- (void)handleDataError:(NSError *)error {
+    [self showAlert:@"数据错误" message:error.localizedDescription];
+}
+
+// MARK: - 生命周期和UI方法
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     if (!self.apiKey || [self.apiKey length] == 0) {
@@ -218,10 +261,8 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 - (void)getAdcodeForCity:(NSString *)cityName
               completion:(void (^)(NSString *adcode, NSError *error))completion {
     if (!cityName || cityName.length == 0) {
-        NSError *error =
-            [NSError errorWithDomain:@"WeatherSearcher"
-                                code:WeatherErrorCodeCityNameEmpty
-                            userInfo:@{NSLocalizedDescriptionKey : @"城市名称不能为空"}];
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeCityNameEmpty 
+                                           message:@"城市名称不能为空"];
         completion(nil, error);
         return;
     }
@@ -230,10 +271,8 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     // api直接输入adcode也可以查询，但直接输入100000/中国/中，其格式与其他输入不同，为了规避该问题，禁止用户输入中国或100000
     if ([cityName isEqualToString:@"中国"] || [cityName isEqualToString:@"100000"] ||
         [cityName isEqualToString:@"中"]) {
-        NSError *error = [NSError
-            errorWithDomain:@"WeatherSearcher"
-                       code:WeatherErrorCodeCityNotSupported
-                   userInfo:@{NSLocalizedDescriptionKey : @"仅支持省级及以下行政区划的查询"}];
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeCityNotSupported 
+                                           message:@"仅支持省级及以下行政区划的查询"];
         completion(nil, error);
         return;
     }
@@ -258,10 +297,8 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
               }
 
               if (!data) {
-                  NSError *noDataError =
-                      [NSError errorWithDomain:@"WeatherSearcher"
-                                          code:WeatherErrorCodeNetworkNoData
-                                      userInfo:@{NSLocalizedDescriptionKey : @"未收到数据"}];
+                  NSError *noDataError = [self createErrorWithCode:WeatherErrorCodeNetworkNoData 
+                                                           message:@"未收到数据"];
                   completion(nil, noDataError);
                   return;
               }
@@ -278,10 +315,8 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
               // 获取districts数组
               NSArray *districts = jsonResponse[@"districts"];
               if (!districts || districts.count == 0) {
-                  NSError *notFoundError =
-                      [NSError errorWithDomain:@"WeatherSearcher"
-                                          code:WeatherErrorCodeCityNotFound
-                                      userInfo:@{NSLocalizedDescriptionKey : @"未找到该城市"}];
+                  NSError *notFoundError = [self createErrorWithCode:WeatherErrorCodeCityNotFound 
+                                                             message:@"未找到该城市"];
                   completion(nil, notFoundError);
                   return;
               }
@@ -291,10 +326,8 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
               NSString *adcode = firstDistrict[@"adcode"];
 
               if (!adcode) {
-                  NSError *noAdcodeError =
-                      [NSError errorWithDomain:@"WeatherSearcher"
-                                          code:WeatherErrorCodeAdcodeNotFound
-                                      userInfo:@{NSLocalizedDescriptionKey : @"未获取到adcode"}];
+                  NSError *noAdcodeError = [self createErrorWithCode:WeatherErrorCodeAdcodeNotFound 
+                                                             message:@"未获取到adcode"];
                   completion(nil, noAdcodeError);
                   return;
               }
@@ -303,28 +336,6 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
           }];
 
     [task resume];
-}
-
-- (void)showAlert:(NSString *)title message:(NSString *)message {
-    UIAlertController *alert =
-        [UIAlertController alertControllerWithTitle:title
-                                            message:message
-                                     preferredStyle:UIAlertControllerStyleAlert];
-
-    // 添加确定按钮来关闭alert
-    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"确定"
-                                                       style:UIAlertActionStyleDefault
-                                                     handler:^(UIAlertAction *_Nonnull action) {
-                                                         // 点击确定后的操作（可以为空，仅用于关闭alert）
-                                                         NSLog(@"用户点击了确定按钮");
-                                                     }];
-
-    [alert addAction:okAction];
-
-    // 在主线程中显示alert
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self presentViewController:alert animated:YES completion:nil];
-    });
 }
 
 - (void)fetchWeatherWithAdcode:(NSString *)adcode {
@@ -342,7 +353,7 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
           completionHandler:^(
               NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
               if (error) {
-                  [self showAlert:@"网络错误" message:@"网络请求失败"];
+                  [self handleNetworkError:error];
                   return;
               }
 
@@ -352,7 +363,9 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                                                                                options:0
                                                                                  error:&jsonError];
                   if (jsonError) {
-                      [self showAlert:@"数据解析错误" message:@"数据解析错误"];
+                      NSError *parseError = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
+                                                              message:@"数据解析错误"];
+                      [self handleDataError:parseError];
                       return;
                   }
 
@@ -370,44 +383,53 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 - (void)displayWeatherData:(NSDictionary *)jsonResponse {
     // 检查API返回状态
     if (!jsonResponse || ![jsonResponse isKindOfClass:[NSDictionary class]]) {
-        [self showAlert:@"错误" message:@"天气数据格式错误"];
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
+                                           message:@"天气数据格式错误"];
+        [self handleDataError:error];
         return;
     }
 
     NSInteger statusCode = [jsonResponse[@"status"] integerValue];
     if (statusCode != 1) {
-        [self showAlert:@"错误" message:@"获取天气信息失败"];
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
+                                           message:@"获取天气信息失败"];
+        [self handleDataError:error];
         return;
     }
 
     // 解析天气数据
     NSArray *lives = jsonResponse[@"lives"];
     if (![lives isKindOfClass:[NSArray class]] || lives.count == 0) {
-        [self showAlert:@"错误" message:@"暂无天气数据"];
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherDataEmpty 
+                                           message:@"暂无天气数据"];
+        [self handleDataError:error];
         return;
     }
 
     NSDictionary *weatherInfo = lives[0];
     if (![weatherInfo isKindOfClass:[NSDictionary class]]) {
-        [self showAlert:@"错误" message:@"天气详情数据格式错误"];
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
+                                           message:@"天气详情数据格式错误"];
+        [self handleDataError:error];
         return;
     }
     NSObject *weatherData = [[WeatherData alloc] initWithDictionary:(NSDictionary *)weatherInfo];
     if (!weatherData) {
-        [self showAlert:@"错误" message:@"天气数据解析失败"];
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
+                                           message:@"天气数据解析失败"];
+        [self handleDataError:error];
         return;
     }
     [self updateWeatherCard:weatherData];
 }
+
 // 更新天气卡片
-- (void)updateWeatherCard:(WeatherData *)weatherData {
+- (void)updateWeatherCard:(WeatherData *) weatherData {
     // 更新标签内容
-    self.locationLabel.text =
-        [NSString stringWithFormat:@"%@ · %@", weatherData.province, weatherData.city];
+    self.locationLabel.text = [NSString stringWithFormat:@"%@ · %@", weatherData.province, weatherData.city];
     self.temperatureLabel.text = [NSString stringWithFormat:@"%@°", weatherData.temperature];
     self.weatherLabel.text = weatherData.weather;
-    self.windLabel.text = [NSString
-        stringWithFormat:@"风向: %@ %@级", weatherData.windDirection, weatherData.windPower];
+    self.windLabel.text = [NSString stringWithFormat:@"风向: %@ %@级", weatherData.windDirection, weatherData.windPower];
     self.humidityLabel.text = [NSString stringWithFormat:@"湿度: %@%%", weatherData.humidity];
     self.updateTimeLabel.text = [NSString stringWithFormat:@"更新时间: %@", weatherData.reportTime];
 
@@ -477,12 +499,9 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                     if (error) {
                         NSLog(@"错误: %@", error.localizedDescription);
                         dispatch_async(dispatch_get_main_queue(), ^{
-                            [self showAlert:@"错误" message:error.localizedDescription];
-                        });
-                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [self handleDataError:error];
                             [self hideLoading];
                         });
-
                         return;
                     }
                     NSLog(@"adcode: %@", adcode);
