@@ -234,6 +234,9 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
     if (!keyPath) {
         NSLog(@"错误: 无法找到API密钥文件");
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeAPIKeyNotFound 
+                                           message:@"无法找到API密钥文件"];
+        [self handleDataError:error];
         return;
     }
 
@@ -244,6 +247,9 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
     if (readError) {
         NSLog(@"读取文件错误: %@", readError.localizedDescription);
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeAPIKeyNotFound 
+                                           message:@"无法找到API密钥文件"];
+        [self handleDataError:error];
         return;
     }
 
@@ -251,6 +257,9 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
     if (!key || key.length == 0) {
         NSLog(@"错误: API密钥为空");
+        NSError *error = [self createErrorWithCode:WeatherErrorCodeAPIKeyEmpty 
+                                           message:@"API密钥为空"];
+        [self handleDataError:error];
         return;
     } else {
         self.apiKey = key;
@@ -323,9 +332,15 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
               // 获取第一个匹配结果的adcode
               NSDictionary *firstDistrict = districts[0];
-              NSString *adcode = firstDistrict[@"adcode"];
+              if (![firstDistrict isKindOfClass:[NSDictionary class]]) {
+                  NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
+                                                       message:@"地区数据格式错误"];
+                  completion(nil, error);
+                  return;
+              }
 
-              if (!adcode) {
+              NSString *adcode = firstDistrict[@"adcode"];
+              if (![adcode isKindOfClass:[NSString class]] || adcode.length == 0) {
                   NSError *noAdcodeError = [self createErrorWithCode:WeatherErrorCodeAdcodeNotFound 
                                                              message:@"未获取到adcode"];
                   completion(nil, noAdcodeError);
@@ -350,81 +365,116 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
     NSURLSessionDataTask *task = [session
         dataTaskWithRequest:request
-          completionHandler:^(
-              NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
-              if (error) {
-                  [self handleNetworkError:error];
-                  return;
-              }
-
-              if (data) {
-                  NSError *jsonError;
-                  NSDictionary *jsonResponse = [NSJSONSerialization JSONObjectWithData:data
-                                                                               options:0
-                                                                                 error:&jsonError];
-                  if (jsonError) {
-                      NSError *parseError = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
-                                                              message:@"数据解析错误"];
-                      [self handleDataError:parseError];
-                      return;
+          completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
+              // 在后台线程进行数据处理
+              WeatherData *weatherData = [self processWeatherResponse:data error:error];
+              
+              // 在UI更新时切换到主线程
+              dispatch_async(dispatch_get_main_queue(), ^{
+                  if (weatherData) {
+                      [self updateWeatherCard:weatherData];
                   }
-
-                  dispatch_async(dispatch_get_main_queue(), ^{
-                      NSLog(@"天气数据: %@", jsonResponse);
-                      [self displayWeatherData:jsonResponse];
-                  });
-              }
+              });
           }];
 
     [task resume];
 }
 
-// 显示天气数据
-- (void)displayWeatherData:(NSDictionary *)jsonResponse {
+// 在后台线程处理数据
+- (WeatherData *)processWeatherResponse:(NSData *)data error:(NSError *)error {
+    if (error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self handleNetworkError:error];
+        });
+        return nil;
+    }
+
+    if (!data) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *noDataError = [self createErrorWithCode:WeatherErrorCodeNetworkNoData 
+                                                      message:@"未收到数据"];
+            [self handleDataError:noDataError];
+        });
+        return nil;
+    }
+
+    NSError *jsonError;
+    NSDictionary *jsonResponse = [NSJSONSerialization JSONObjectWithData:data
+                                                                 options:0
+                                                                   error:&jsonError];
+    if (jsonError) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *parseError = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
+                                                     message:@"数据解析错误"];
+            [self handleDataError:parseError];
+        });
+        return nil;
+    }
+
+    return [self parseWeatherData:jsonResponse];
+}
+
+// 纯数据解析，不涉及UI操作
+- (WeatherData *)parseWeatherData:(NSDictionary *)jsonResponse {
     // 检查API返回状态
     if (!jsonResponse || ![jsonResponse isKindOfClass:[NSDictionary class]]) {
-        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
-                                           message:@"天气数据格式错误"];
-        [self handleDataError:error];
-        return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
+                                               message:@"天气数据格式错误"];
+            [self handleDataError:error];
+        });
+        return nil;
     }
 
     NSInteger statusCode = [jsonResponse[@"status"] integerValue];
     if (statusCode != 1) {
-        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
-                                           message:@"获取天气信息失败"];
-        [self handleDataError:error];
-        return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
+                                               message:@"获取天气信息失败"];
+            [self handleDataError:error];
+        });
+        return nil;
     }
 
     // 解析天气数据
     NSArray *lives = jsonResponse[@"lives"];
     if (![lives isKindOfClass:[NSArray class]] || lives.count == 0) {
-        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherDataEmpty 
-                                           message:@"暂无天气数据"];
-        [self handleDataError:error];
-        return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherDataEmpty 
+                                               message:@"暂无天气数据"];
+            [self handleDataError:error];
+        });
+        return nil;
     }
 
     NSDictionary *weatherInfo = lives[0];
     if (![weatherInfo isKindOfClass:[NSDictionary class]]) {
-        NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
-                                           message:@"天气详情数据格式错误"];
-        [self handleDataError:error];
-        return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
+                                               message:@"天气详情数据格式错误"];
+            [self handleDataError:error];
+        });
+        return nil;
     }
-    NSObject *weatherData = [[WeatherData alloc] initWithDictionary:(NSDictionary *)weatherInfo];
+    
+    WeatherData *weatherData = [[WeatherData alloc] initWithDictionary:(NSDictionary *)weatherInfo];
     if (!weatherData) {
-        NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
-                                           message:@"天气数据解析失败"];
-        [self handleDataError:error];
-        return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
+                                               message:@"天气数据解析失败"];
+            [self handleDataError:error];
+        });
+        return nil;
     }
-    [self updateWeatherCard:weatherData];
+    
+    return weatherData;
 }
 
-// 更新天气卡片
-- (void)updateWeatherCard:(WeatherData *) weatherData {
+// 确保UI更新在主线程 - 添加断言检查
+- (void)updateWeatherCard:(WeatherData *)weatherData {
+    // 断言确保在主线程
+    NSAssert([NSThread isMainThread], @"UI更新必须在主线程中执行");
+    
     // 更新标签内容
     self.locationLabel.text = [NSString stringWithFormat:@"%@ · %@", weatherData.province, weatherData.city];
     self.temperatureLabel.text = [NSString stringWithFormat:@"%@°", weatherData.temperature];
@@ -433,47 +483,30 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     self.humidityLabel.text = [NSString stringWithFormat:@"湿度: %@%%", weatherData.humidity];
     self.updateTimeLabel.text = [NSString stringWithFormat:@"更新时间: %@", weatherData.reportTime];
 
-    /*
-    // 显示动画（正确方式）
-    self.weatherView.hidden = NO;           // 先设置为显示
-    self.weatherView.alpha = 0.0;           // 但是透明
-    [UIView animateWithDuration:0.3 animations:^{
-        self.weatherView.alpha = 1.0;       // 动画到不透明
-    }];
+    // 显示天气卡片动画
+    [self showWeatherCardWithAnimation];
+}
 
-    // 隐藏动画（正确方式）
-    [UIView animateWithDuration:0.3 animations:^{
-        self.weatherView.alpha = 0.0;       // 动画到透明
-    } completion:^(BOOL finished) {
-        self.weatherView.hidden = YES;      // 动画结束后真正隐藏
-    }];
-    */
-    // 显示天气卡片
+// 分离动画逻辑
+- (void)showWeatherCardWithAnimation {
     if (self.weatherView.hidden) {
         self.weatherView.hidden = NO;
         self.weatherView.alpha = 0.0;
-        // 缩小到80，方便由小到大的动画效果
         self.weatherView.transform = CGAffineTransformMakeScale(0.8, 0.8);
 
-        // 从小到大的动画
         [UIView animateWithDuration:0.8
                               delay:0.0
              usingSpringWithDamping:2
               initialSpringVelocity:0.1
-                            // 淡入淡出
                             options:UIViewAnimationOptionCurveEaseInOut
-
                          animations:^{
                              self.weatherView.alpha = 1.0;
-                             // 恢复到原始大小
                              self.weatherView.transform = CGAffineTransformIdentity;
                          }
                          completion:nil];
     } else {
-        // 如果已经显示，添加轻微的动画
         [UIView animateWithDuration:0.2
             animations:^{
-                // 由大变小，强调已经有了结果
                 self.weatherView.transform = CGAffineTransformMakeScale(1.2, 1.2);
             }
             completion:^(BOOL finished) {

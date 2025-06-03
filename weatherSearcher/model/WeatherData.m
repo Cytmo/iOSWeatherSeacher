@@ -21,16 +21,26 @@
         return nil;
     }
     if(self){
-        _province = [dictionary[@"province"] isKindOfClass:[NSString class]] ? [dictionary[@"province"] copy]: @"未知省份";
-        _city = [dictionary[@"city"] isKindOfClass:[NSString class]] ? [dictionary[@"city"] copy]: @"未知城市";
-        _weather = [dictionary[@"weather"] isKindOfClass:[NSString class]] ? [dictionary[@"weather"] copy]: @"未知天气";
-        _temperature = [dictionary[@"temperature"] isKindOfClass:[NSString class]] ? [dictionary[@"temperature"] copy]: @"未知温度";
-        _windDirection = [dictionary[@"winddirection"] isKindOfClass:[NSString class]] ? [dictionary[@"winddirection"] copy]: @"未知风向";
-        _windPower = [dictionary[@"windpower"] isKindOfClass:[NSString class]] ? [dictionary[@"windpower"] copy]: @"未知风力";
-        _humidity = [dictionary[@"humidity"] isKindOfClass:[NSString class]] ? [dictionary[@"humidity"] copy]: @"未知湿度";
-        _reportTime = [dictionary[@"reporttime"] isKindOfClass:[NSString class]] ? [dictionary[@"reporttime"] copy]: @"未知时间";
+        _province = [self safeStringFromValue:dictionary[@"province"] defaultValue:@"未知省份"];
+        _city = [self safeStringFromValue:dictionary[@"city"] defaultValue:@"未知城市"];
+        _weather = [self safeStringFromValue:dictionary[@"weather"] defaultValue:@"未知天气"];
+        _temperature = [self safeStringFromValue:dictionary[@"temperature"] defaultValue:@"未知温度"];
+        _windDirection = [self safeStringFromValue:dictionary[@"winddirection"] defaultValue:@"未知风向"];
+        _windPower = [self safeStringFromValue:dictionary[@"windpower"] defaultValue:@"未知风力"];
+        _humidity = [self safeStringFromValue:dictionary[@"humidity"] defaultValue:@"未知湿度"];
+        _reportTime = [self safeStringFromValue:dictionary[@"reporttime"] defaultValue:@"未知时间"];
     }
     return self;
+}
+
+- (NSString *)safeStringFromValue:(id)value defaultValue:(NSString *)defaultValue {
+    if ([value isKindOfClass:[NSString class]]) {
+        NSString *stringValue = (NSString *)value;
+        return stringValue.length > 0 ? [stringValue copy] : defaultValue;
+    } else if ([value isKindOfClass:[NSNumber class]]) {
+        return [(NSNumber *)value stringValue];
+    }
+    return defaultValue;
 }
 
 @end
