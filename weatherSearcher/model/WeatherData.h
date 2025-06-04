@@ -25,9 +25,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *reportTime;
 
 
-
+// 指定初始化方法
 - (nullable instancetype)initWithDictionary:(NSDictionary *)dictionary NS_DESIGNATED_INITIALIZER;
 
+// 禁用init和new方法，防止外部直接调用
 - (instancetype) init NS_UNAVAILABLE;
 + (instancetype) new NS_UNAVAILABLE;
 

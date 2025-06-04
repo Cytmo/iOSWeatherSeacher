@@ -9,6 +9,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import "WeatherData.h"
+#import <Masonry/Masonry.h> 
 // 不需要相对路径，因为iOS Bundle会将所有资源文件扁平化存储
 NSString *const API_KEY_PATH = @"gaodeMapApiKey";
 
@@ -40,8 +41,6 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
 @implementation ViewController
 
-// MARK: - 错误处理相关方法
-
 // 创建自定义错误
 - (NSError *)createErrorWithCode:(WeatherErrorCode)code message:(NSString *)message {
     return [NSError errorWithDomain:@"WeatherSearcher" 
@@ -49,7 +48,7 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                            userInfo:@{NSLocalizedDescriptionKey: message}];
 }
 
-// 通用错误显示方法
+// 错误显示
 - (void)showAlert:(NSString *)title message:(NSString *)message {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
@@ -81,7 +80,6 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     [self showAlert:@"数据错误" message:error.localizedDescription];
 }
 
-// MARK: - 生命周期和UI方法
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -135,86 +133,201 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 }
 
 - (void)setupConstraints {
-    [NSLayoutConstraint activateConstraints:@[
-        // 搜索框约束
-        [self.searchTextField.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.searchTextField.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor
-                                                           constant:-50],
-        [self.searchTextField.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor
-                                                           constant:40],
-        [self.searchTextField.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor
-                                                            constant:-40],
-        [self.searchTextField.heightAnchor constraintEqualToConstant:44],
+    /*
+     * Auto Layout: [view.centerXAnchor constraintEqualToAnchor:superview.centerXAnchor]
+     * Masonry: make.centerX.equalTo(superview)
+     * 
+     * autolayout与masonry的属性
+     * centerXAnchor -> centerX
+     * centerYAnchor -> centerY  
+     * leadingAnchor -> left (或leading)
+     * trailingAnchor -> right (或trailing)
+     * topAnchor -> top
+     * bottomAnchor -> bottom
+     * widthAnchor -> width
+     * heightAnchor -> height
+     引用其他视图的约束属性时需要mas_前缀
+     规则1：make.后面的不需要mas_
+     规则2：equalTo()里面引用其他view的需要mas_
 
-        // 搜索按钮约束
-        [self.searchButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.searchButton.topAnchor constraintEqualToAnchor:self.searchTextField.bottomAnchor
-                                                    constant:20],
-        [self.searchButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor
-                                                        constant:40],
-        [self.searchButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor
-                                                         constant:-40],
-        [self.searchButton.heightAnchor constraintEqualToConstant:44],
+     */
+    
+    /*
+     * Auto Layout
+     * [self.searchTextField.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+     * [self.searchTextField.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:-50],
+     * [self.searchTextField.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:40],
+     * [self.searchTextField.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-40],
+     * [self.searchTextField.heightAnchor constraintEqualToConstant:44],
+     * 
+     * Masonry
+     * - mas_makeConstraints: 创建新约束
+     * - equalTo(): 等于某个值或视图(constraintEqualToAnchor)
+     * - offset(): 添加偏移量，相当于constant
+     * - 链式语法：可以连续调用多个方法
+     */
+    [self.searchTextField mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);                    // 水平居中
+        make.centerY.equalTo(self.view).offset(-50);        // 垂直居中，向上偏移50点
+        make.left.equalTo(self.view).offset(40);            // 左边距40点
+        make.right.equalTo(self.view).offset(-40);          // 右边距40点
+        make.height.equalTo(@44);                           // 高度44点
+    }];
+    
+    /*
+     * Auto Layout
+     * [self.searchButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+     * [self.searchButton.topAnchor constraintEqualToAnchor:self.searchTextField.bottomAnchor constant:20],
+     * [self.searchButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:40],
+     * [self.searchButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-40],
+     * [self.searchButton.heightAnchor constraintEqualToConstant:44],
+     * 
+     *  Masonry
+     * - mas_bottom: 获取视图的底部约束点
+     * - left.right.equalTo(): 同时设置左右约束的简化写法
+     * - 相对约束：相对于其他视图定位
+     */
+    [self.searchButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);                    // 水平居中
+        make.top.equalTo(self.searchTextField.mas_bottom).offset(20);  // 距离搜索框底部20点
+        make.left.right.equalTo(self.searchTextField);     // 左右边距与搜索框一致
+        make.height.equalTo(@44);                           // 高度44点
+    }];
+    
+    /*
+     * Auto Layout
+     * [self.loadingIndicator.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+     * [self.loadingIndicator.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+     * 
+     * Masonry
+     * - center: 同时设置centerX和centerY的简化属性
+     */
+    [self.loadingIndicator mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(self.view);                   
+    }];
+    
+    /*
+     * Auto Layou
+     * [self.weatherView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+     * [self.weatherView.topAnchor constraintEqualToAnchor:self.searchButton.bottomAnchor constant:30],
+     * [self.weatherView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:40],
+     * [self.weatherView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-40],
+     * [self.weatherView.heightAnchor constraintEqualToConstant:200],
+     * 
+     * Masonry复用
+     * - 复用已有视图的约束：left.right.equalTo(searchTextField)
+     * - 避免重复定义相同的边距值
+     */
+    [self.weatherView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);                    // 水平居中
+        make.top.equalTo(self.searchButton.mas_bottom).offset(30);  // 距离按钮底部30点
+        make.left.right.equalTo(self.searchTextField);     // 与搜索框左右对齐
+        make.height.equalTo(@200);                          // 高度200点
+    }];
+        
+    /*
+     * Auto Layout
+     * [self.locationLabel.topAnchor constraintEqualToAnchor:self.weatherView.topAnchor constant:16],
+     * [self.locationLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor constant:16],
+     * [self.locationLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor constant:-16],
+     * 
+     * Masonry边距
+     * - insets(): 统一设置四个方向的边距
+     * - UIEdgeInsetsMake(top, left, bottom, right)
+     */
+    [self.locationLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.weatherView).offset(16);      // 距离顶部16点
+        make.left.right.equalTo(self.weatherView).insets(UIEdgeInsetsMake(0, 16, 0, 16));  // 左右边距16点
+    }];
+    
+    /*
+     Auto Layout
+     * [self.temperatureLabel.topAnchor constraintEqualToAnchor:self.locationLabel.bottomAnchor constant:8],
+     * [self.temperatureLabel.centerXAnchor constraintEqualToAnchor:self.weatherView.centerXAnchor],
+     */
 
-        // 加载约束
-        [self.loadingIndicator.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.loadingIndicator.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+    [self.temperatureLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.locationLabel.mas_bottom).offset(8);  // 距离位置标签底部8点
+        make.centerX.equalTo(self.weatherView);             // 在天气卡片中水平居中
+    }];
+    
+    // 天气状况标签
+    /*
+     * Auto Layout
+     * [self.weatherLabel.topAnchor constraintEqualToAnchor:self.temperatureLabel.bottomAnchor constant:4],
+     * [self.weatherLabel.centerXAnchor constraintEqualToAnchor:self.weatherView.centerXAnchor],
+     */
+    [self.weatherLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.temperatureLabel.mas_bottom).offset(4);  // 距离温度标签底部4点
+        make.centerX.equalTo(self.weatherView);             // 在天气卡片中水平居中 在此处center和centerX的效果一致
+    }];
+    
+    // 风向风力标签（左侧）
+    /*
+     * Auto Layout
+     * [self.windLabel.topAnchor constraintEqualToAnchor:self.weatherLabel.bottomAnchor constant:12],
+     * [self.windLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor constant:16],
+     * [self.windLabel.widthAnchor constraintEqualToAnchor:self.weatherView.widthAnchor multiplier:0.45],
+     * 
+     * Masonry比例约束
+     * - multipliedBy(): 设置比例约束，相当于multiplier
+     */
+    [self.windLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.weatherLabel.mas_bottom).offset(12);  // 距离天气标签底部12点
+        make.left.equalTo(self.weatherView).offset(16);     // 左边距16点
+        make.width.equalTo(self.weatherView).multipliedBy(0.45);  // 宽度为父视图的45%
+    }];
+    
+    // 湿度标签（右侧）
+    /*
+     * Auto Layout
+     * [self.humidityLabel.topAnchor constraintEqualToAnchor:self.weatherLabel.bottomAnchor constant:12],
+     * [self.humidityLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor constant:-16],
+     * [self.humidityLabel.widthAnchor constraintEqualToAnchor:self.weatherView.widthAnchor multiplier:0.45],
+     */
 
-        /*
-        centerXAnchor     // 水平
-        topAnchor         // 相对顶部位置
-        leadingAnchor     // 左边距
-        trailingAnchor    // 右边距
-        heightAnchor      // 高度
-        */
-        // 天气卡片约束
-        [self.weatherView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.weatherView.topAnchor constraintEqualToAnchor:self.searchButton.bottomAnchor
-                                                   constant:30],
-        [self.weatherView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor
-                                                       constant:40],
-        [self.weatherView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor
-                                                        constant:-40],
-        [self.weatherView.heightAnchor constraintEqualToConstant:200],
+    [self.humidityLabel mas_makeConstraints:^(MASConstraintMaker *make){
+        make.top.equalTo(self.weatherLabel.mas_bottom).offset(12);
+        make.trailing.equalTo(self.weatherView.mas_trailing).offset(-16);
+        make.width.equalTo(self.weatherView).multipliedBy(0.45);// 宽度为父视图的45%
+    }];
 
-        // 天气卡片内部标签约束 UILabel会根据内容自动计算宽高
-        [self.locationLabel.topAnchor constraintEqualToAnchor:self.weatherView.topAnchor
-                                                     constant:16],
-        [self.locationLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor
-                                                         constant:16],
-        [self.locationLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor
-                                                          constant:-16],
+    
+    // 更新时间标签
+    /*
+     * Auto Layout
+     * [self.updateTimeLabel.bottomAnchor constraintEqualToAnchor:self.weatherView.bottomAnchor constant:-12],
+     * [self.updateTimeLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor constant:16],
+     * [self.updateTimeLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor constant:-16],
+     * 
+     * Masonry底部对齐
+     * - bottom.equalTo(): 底部对齐约束
+     * - 负值offset表示向上偏移
+   UIEdgeInsetsMake(top, left, bottom, right)
+                |    |     |      |
+                |    |     |      右边距
+                |    |     底边距  
+                |    左边距
+                顶边距   
+     top 和 left 是正值时向内缩进
+     bottom 和 right 是正值时向内缩进
+    */
 
-        [self.temperatureLabel.topAnchor constraintEqualToAnchor:self.locationLabel.bottomAnchor
-                                                        constant:8],
-        [self.temperatureLabel.centerXAnchor
-            constraintEqualToAnchor:self.weatherView.centerXAnchor],
+    // 设置所有边距为10点
+    // [view mas_makeConstraints:^(MASConstraintMaker *make) {
+    //     make.edges.equalTo(superview).insets(UIEdgeInsetsMake(10, 10, 10, 10));
+    // }];
 
-        [self.weatherLabel.topAnchor constraintEqualToAnchor:self.temperatureLabel.bottomAnchor
-                                                    constant:4],
-        [self.weatherLabel.centerXAnchor constraintEqualToAnchor:self.weatherView.centerXAnchor],
+    // 等价于原生Auto Layout的：
+    // view.top = superview.top + 10
+    // view.left = superview.left + 10  
+    // view.bottom = superview.bottom - 10
+    // view.right = superview.right - 10
+    [self.updateTimeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.bottom.equalTo(self.weatherView).offset(-12);  
+        make.left.right.equalTo(self.weatherView).insets(UIEdgeInsetsMake(0, 16, 0, 16));  
+    }];
 
-        [self.windLabel.topAnchor constraintEqualToAnchor:self.weatherLabel.bottomAnchor
-                                                 constant:12],
-        [self.windLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor
-                                                     constant:16],
-        [self.windLabel.widthAnchor constraintEqualToAnchor:self.weatherView.widthAnchor
-                                                 multiplier:0.45],
-
-        [self.humidityLabel.topAnchor constraintEqualToAnchor:self.weatherLabel.bottomAnchor
-                                                     constant:12],
-        [self.humidityLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor
-                                                          constant:-16],
-        [self.humidityLabel.widthAnchor constraintEqualToAnchor:self.weatherView.widthAnchor
-                                                     multiplier:0.45],
-
-        [self.updateTimeLabel.bottomAnchor constraintEqualToAnchor:self.weatherView.bottomAnchor
-                                                          constant:-12],
-        [self.updateTimeLabel.leadingAnchor constraintEqualToAnchor:self.weatherView.leadingAnchor
-                                                           constant:16],
-        [self.updateTimeLabel.trailingAnchor constraintEqualToAnchor:self.weatherView.trailingAnchor
-                                                            constant:-16],
-    ]];
 }
 
 - (void)showLoading {
@@ -470,7 +583,6 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     return weatherData;
 }
 
-// 确保UI更新在主线程 - 添加断言检查
 - (void)updateWeatherCard:(WeatherData *)weatherData {
     // 断言确保在主线程
     NSAssert([NSThread isMainThread], @"UI更新必须在主线程中执行");
