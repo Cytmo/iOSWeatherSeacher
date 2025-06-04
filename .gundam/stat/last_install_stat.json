@@ -1,0 +1,29 @@
+{
+  "items": [
+    {
+      "pod_version": "1.16.2",
+      "start_time": "2025-06-03T15:55:40.597+08:00",
+      "success": false,
+      "git": {
+        "user_name": "kongweichen",
+        "user_email": "kongweichen@kuaishou.com",
+        "branch": "feature/optimize-according-to-advice",
+        "commit": "9de114e",
+        "remote": "https://github.com/Cytmo/iOSWeatherSeacher.git",
+        "whoami": "kongweichen"
+      },
+      "upload_time": "2025-06-03T15:55:40.597+08:00",
+      "upload_ts": 1748937340,
+      "ruby_version": "3.1.5",
+      "os_version": "15.5",
+      "ip": "172.23.206.48",
+      "cpu": "Apple M4 Pro",
+      "xcode_version": "16.3",
+      "xcode_build_version": "16E140",
+      "errors": "\n[!] Invalid `Podfile` file: undefined method `ios' for #<Pod::Podfile:0x00000001182eac98 @defined_in_file=#<Pathname:/Users/kongweichen/Codes/weatherSearcher/Podfile>, @internal_hash={}, @root_target_definitions=[#<Pod::Podfile::TargetDefinition label=Pods>], @current_target_definition=#<Pod::Podfile::TargetDefinition label=Pods>>.\n",
+      "name": "pod install error",
+      "task_id": null,
+      "pod_install_id": "60876cec1010ff600d6e3e4dc36fca65"
+    }
+  ]
+}
