@@ -5,11 +5,99 @@
 //  Created by 孔维辰 on 2025/5/27.
 //
 
+/*
+ * 【核心类介绍】
+ * 
+ * 1. AFHTTPSessionManager - 核心网络管理类
+ *    - 封装NSURLSession的复杂操作
+ *    - 提供GET、POST、PUT、DELETE等HTTP方法
+ *    - 管理请求头、超时、认证等配置
+ * 
+ * 2. 请求序列化器 (Request Serializers)
+ *    - AFHTTPRequestSerializer: 标准HTTP请求(默认)
+ *    - AFJSONRequestSerializer: JSON格式请求体
+ *    - AFPropertyListRequestSerializer: Plist格式请求体
+ * 
+ * 3. 响应序列化器 (Response Serializers)
+ *    - AFJSONResponseSerializer: JSON响应解析(默认)
+ *    - AFXMLParserResponseSerializer: XML响应解析
+ *    - AFHTTPResponseSerializer: 原始NSData响应
+ * 
+ * 【基本使用模式】
+ * 
+ * // 1. 创建管理器
+ * AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+ * 
+ * // 2. 配置序列化器(可选)
+ * manager.requestSerializer = [AFJSONRequestSerializer serializer];
+ * manager.responseSerializer = [AFJSONResponseSerializer serializer];
+ * 
+ * // 3. 发送请求
+ * [manager GET:@"https://api.example.com/data"
+ *   parameters:@{@"key": @"value"}
+ *      headers:@{@"Authorization": @"Bearer token"}
+ *     progress:^(NSProgress *progress) {
+ *         // 进度回调(可选)
+ *     }
+ *      success:^(NSURLSessionDataTask *task, id responseObject) {
+ *         // 成功回调 - responseObject已解析为NSDictionary/NSArray
+ *      }
+ *      failure:^(NSURLSessionDataTask *task, NSError *error) {
+ *         // 失败回调 - 网络错误或HTTP状态码错误
+ *      }];
+ * 
+ * 【参数说明】
+ * 
+ * parameters: 请求参数
+ * - GET请求: 自动拼接到URL查询字符串
+ * - POST请求: 根据requestSerializer编码为请求体
+ * 
+ * headers: 自定义HTTP请求头
+ * - 常用于认证、内容类型等
+ * 
+ * progress: 进度监控Block
+ * - 主要用于文件上传下载
+ * - 小数据请求可传nil
+ * 
+ * success: 成功回调Block
+ * - task: NSURLSessionDataTask实例
+ * - responseObject: 已解析的响应对象(NSDictionary/NSArray/NSData)
+ * 
+ * failure: 失败回调Block  
+ * - task: NSURLSessionDataTask实例(可能为nil)
+ * - error: 错误信息(网络错误、HTTP状态码错误等)
+ * 
+ * 【线程模型】
+ * AFNetworking的success/failure回调默认在主线程执行
+ * 这意味着可以直接在回调中更新UI，无需手动dispatch_async
+ * 但为了代码清晰和确保一致性，建议显式使用dispatch_async
+ * 
+ * 【错误处理】
+ * AFNetworking会自动处理以下错误：
+ * - 网络连接错误 (无网络、超时等)
+ * - HTTP状态码错误 (4xx、5xx)
+ * - JSON解析错误 (响应不是有效JSON)
+ * 
+ * 业务逻辑错误仍需在success回调中检查：
+ * - API返回的status字段
+ * - 数据完整性验证
+ * 
+ * 【最佳实践】
+ * 1. 使用单例模式管理AFHTTPSessionManager
+ * 2. 统一配置baseURL、超时时间、请求头
+ * 3. 在success回调中验证业务逻辑
+ * 4. 使用dispatch_async确保UI更新在主线程
+ * 5. 合理处理网络状态变化
+ * 
+ * ================================================================
+ */
+
 #import "ViewController.h"
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import "WeatherData.h"
-#import <Masonry/Masonry.h> 
+#import <Masonry/Masonry.h>
+#import <AFNetworking/AFNetworking.h>  // 导入AFNetworking - 现代iOS网络库
 // 不需要相对路径，因为iOS Bundle会将所有资源文件扁平化存储
 NSString *const API_KEY_PATH = @"gaodeMapApiKey";
 
@@ -382,6 +470,8 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
 
 - (void)getAdcodeForCity:(NSString *)cityName
               completion:(void (^)(NSString *adcode, NSError *error))completion {
+    
+    // 参数验证逻辑保持不变
     if (!cityName || cityName.length == 0) {
         NSError *error = [self createErrorWithCode:WeatherErrorCodeCityNameEmpty 
                                            message:@"城市名称不能为空"];
@@ -389,8 +479,6 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
         return;
     }
 
-    // adcode
-    // api直接输入adcode也可以查询，但直接输入100000/中国/中，其格式与其他输入不同，为了规避该问题，禁止用户输入中国或100000
     if ([cityName isEqualToString:@"中国"] || [cityName isEqualToString:@"100000"] ||
         [cityName isEqualToString:@"中"]) {
         NSError *error = [self createErrorWithCode:WeatherErrorCodeCityNotSupported 
@@ -398,189 +486,165 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
         completion(nil, error);
         return;
     }
-    // 构建行政区域查询API URL
+    
+    // URL构建逻辑保持不变
     NSString *urlString =
         [NSString stringWithFormat:@"https://restapi.amap.com/v3/config/"
                                    @"district?keywords=%@&subdistrict=0&extensions=base&key=%@",
                                    cityName,
                                    self.apiKey];
 
-    NSURL *url = [NSURL URLWithString:urlString];
-    NSURLRequest *request = [NSURLRequest requestWithURL:url];
-    NSURLSession *session = [NSURLSession sharedSession];
-
-    NSURLSessionDataTask *task = [session
-        dataTaskWithRequest:request
-          completionHandler:^(
-              NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
-              if (error) {
-                  completion(nil, error);
+    /*
+     * NSURL *url = [NSURL URLWithString:urlString];
+     * NSURLRequest *request = [NSURLRequest requestWithURL:url];
+     * NSURLSession *session = [NSURLSession sharedSession];
+     * 
+     * NSURLSessionDataTask *task = [session
+     *     dataTaskWithRequest:request
+     *       completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
+     *           if (error) {
+     *               completion(nil, error);
+     *               return;
+     *           }
+     *           if (!data) {
+     *               NSError *noDataError = [self createErrorWithCode:WeatherErrorCodeNetworkNoData 
+     *                                                        message:@"未收到数据"];
+     *               completion(nil, noDataError);
+     *               return;
+     *           }
+     *           // 手动JSON解析
+     *           NSError *jsonError;
+     *           NSDictionary *jsonResponse = [NSJSONSerialization JSONObjectWithData:data
+     *                                                                        options:0
+     *                                                                          error:&jsonError];
+     *           if (jsonError) {
+     *               completion(nil, jsonError);
+     *               return;
+     *           }
+     *           // 数据提取逻辑...
+     *       }];
+     * [task resume];
+     */
+    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+    [manager GET:urlString parameters:nil headers:nil progress:nil 
+    success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+        NSArray *districts = responseObject[@"districts"];
+        if(![districts isKindOfClass:[NSArray class]] || [districts count]==0){
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError
+                                               message:@"无法找到行政区划数据"];
+            completion(nil,error);
                   return;
               }
-
-              if (!data) {
-                  NSError *noDataError = [self createErrorWithCode:WeatherErrorCodeNetworkNoData 
-                                                           message:@"未收到数据"];
-                  completion(nil, noDataError);
+        
+        NSDictionary *firstDistrict = districts[0];
+        if (!firstDistrict) {
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError
+                                               message:@"无法找到行政区划数据"];
+            completion(nil,error);
                   return;
               }
-
-              NSError *jsonError;
-              NSDictionary *jsonResponse = [NSJSONSerialization JSONObjectWithData:data
-                                                                           options:0
-                                                                             error:&jsonError];
-              if (jsonError) {
-                  completion(nil, jsonError);
-                  return;
-              }
-
-              // 获取districts数组
-              NSArray *districts = jsonResponse[@"districts"];
-              if (!districts || districts.count == 0) {
-                  NSError *notFoundError = [self createErrorWithCode:WeatherErrorCodeCityNotFound 
-                                                             message:@"未找到该城市"];
-                  completion(nil, notFoundError);
-                  return;
-              }
-
-              // 获取第一个匹配结果的adcode
-              NSDictionary *firstDistrict = districts[0];
-              if (![firstDistrict isKindOfClass:[NSDictionary class]]) {
-                  NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
-                                                       message:@"地区数据格式错误"];
-                  completion(nil, error);
-                  return;
-              }
-
               NSString *adcode = firstDistrict[@"adcode"];
-              if (![adcode isKindOfClass:[NSString class]] || adcode.length == 0) {
-                  NSError *noAdcodeError = [self createErrorWithCode:WeatherErrorCodeAdcodeNotFound 
-                                                             message:@"未获取到adcode"];
-                  completion(nil, noAdcodeError);
-                  return;
-              }
-
-              completion(adcode, nil);
-          }];
-
-    [task resume];
+        completion(adcode,nil);
+    }
+    failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error){
+        completion(nil,error);
+    }
+    ];
+    
 }
 
 - (void)fetchWeatherWithAdcode:(NSString *)adcode {
-    // 构建天气查询API URL
+    // URL构建逻辑保持不变
     NSString *urlString = [NSString
         stringWithFormat:@"https://restapi.amap.com/v3/weather/weatherInfo?city=%@&key=%@",
                          adcode,
                          self.apiKey];
-    NSURL *url = [NSURL URLWithString:urlString];
-    NSURLRequest *request = [NSURLRequest requestWithURL:url];
-    NSURLSession *session = [NSURLSession sharedSession];
 
-    NSURLSessionDataTask *task = [session
-        dataTaskWithRequest:request
-          completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
-              // 在后台线程进行数据处理
-              WeatherData *weatherData = [self processWeatherResponse:data error:error];
-              
-              // 在UI更新时切换到主线程
-              dispatch_async(dispatch_get_main_queue(), ^{
-                  if (weatherData) {
-                      [self updateWeatherCard:weatherData];
-                  }
-              });
-          }];
+    /*
+     * 
+     * NSURL *url = [NSURL URLWithString:urlString];
+     * NSURLRequest *request = [NSURLRequest requestWithURL:url];
+     * NSURLSession *session = [NSURLSession sharedSession];
+     * 
+     * NSURLSessionDataTask *task = [session
+     *     dataTaskWithRequest:request
+     *       completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
+     *           // 复杂的数据处理和线程切换
+     *           WeatherData *weatherData = [self processWeatherResponse:data error:error];
+     *           dispatch_async(dispatch_get_main_queue(), ^{
+     *               if (weatherData) {
+     *                   [self updateWeatherCard:weatherData];
+     *               }
+     *           });
+     *       }];
+     * [task resume];
+     */
 
-    [task resume];
-}
-
-// 在后台线程处理数据
-- (WeatherData *)processWeatherResponse:(NSData *)data error:(NSError *)error {
-    if (error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self handleNetworkError:error];
-        });
-        return nil;
-    }
-
-    if (!data) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSError *noDataError = [self createErrorWithCode:WeatherErrorCodeNetworkNoData 
-                                                      message:@"未收到数据"];
-            [self handleDataError:noDataError];
-        });
-        return nil;
-    }
-
-    NSError *jsonError;
-    NSDictionary *jsonResponse = [NSJSONSerialization JSONObjectWithData:data
-                                                                 options:0
-                                                                   error:&jsonError];
-    if (jsonError) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSError *parseError = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
-                                                     message:@"数据解析错误"];
-            [self handleDataError:parseError];
-        });
-        return nil;
-    }
-
-    return [self parseWeatherData:jsonResponse];
-}
-
-// 纯数据解析，不涉及UI操作
-- (WeatherData *)parseWeatherData:(NSDictionary *)jsonResponse {
-    // 检查API返回状态
-    if (!jsonResponse || ![jsonResponse isKindOfClass:[NSDictionary class]]) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
-                                               message:@"天气数据格式错误"];
-            [self handleDataError:error];
-        });
-        return nil;
-    }
-
-    NSInteger statusCode = [jsonResponse[@"status"] integerValue];
-    if (statusCode != 1) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
-                                               message:@"获取天气信息失败"];
-            [self handleDataError:error];
-        });
-        return nil;
-    }
-
-    // 解析天气数据
-    NSArray *lives = jsonResponse[@"lives"];
-    if (![lives isKindOfClass:[NSArray class]] || lives.count == 0) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherDataEmpty 
-                                               message:@"暂无天气数据"];
-            [self handleDataError:error];
-        });
-        return nil;
-    }
-
-    NSDictionary *weatherInfo = lives[0];
-    if (![weatherInfo isKindOfClass:[NSDictionary class]]) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSError *error = [self createErrorWithCode:WeatherErrorCodeWeatherAPIFailure 
-                                               message:@"天气详情数据格式错误"];
-            [self handleDataError:error];
-        });
-        return nil;
-    }
-    
-    WeatherData *weatherData = [[WeatherData alloc] initWithDictionary:(NSDictionary *)weatherInfo];
-    if (!weatherData) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError 
+    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+    [manager GET:urlString parameters:nil headers:nil progress:nil
+    success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+        WeatherData *weatherData = [self parseWeatherDataFromAFNetworking:responseObject];
+        if(!weatherData) {
+            NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError
                                                message:@"天气数据解析失败"];
-            [self handleDataError:error];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self handleDataError:error];
+            });
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self updateWeatherCard:weatherData];
         });
-        return nil;
+        [self hideLoading];
+    }
+    failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self handleDataError:error];
+            [self hideLoading];
+        });
     }
     
-    return weatherData;
+    ];
+    
+}
+
+/*
+ * 新增方法：专门处理AFNetworking返回的已解析数据
+ * 
+ * 【设计说明】
+ * 原来的processWeatherResponse方法处理NSData和手动JSON解析
+ * 新方法直接处理AFNetworking已解析的NSDictionary
+ * 保持数据解析逻辑的纯净性，不包含UI操作
+ */
+- (WeatherData *)parseWeatherDataFromAFNetworking:(NSDictionary *)jsonResponse {
+    /*
+     * 【实现指导】
+     * 1. 检查jsonResponse类型: if (![jsonResponse isKindOfClass:[NSDictionary class]])
+     * 2. 检查API状态码: NSInteger statusCode = [jsonResponse[@"status"] integerValue];
+     * 3. 验证lives数组: NSArray *lives = jsonResponse[@"lives"];
+     * 4. 提取第一个天气数据: NSDictionary *liveWeather = lives[0];
+     * 5. 创建WeatherData对象: return [[WeatherData alloc] initWithDictionary:liveWeather];
+     * 
+     * 【错误处理】
+     * 返回nil表示解析失败，让调用者处理UI错误提示
+     * 避免在数据解析方法中直接操作UI
+     */
+    
+    if(![jsonResponse isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    NSInteger statusCode = [jsonResponse[@"status"] integerValue];
+    if(statusCode != 1) {
+        return nil;
+    }
+    NSArray *lives = jsonResponse[@"lives"];
+    if(!lives || lives.count == 0) {
+        return nil;
+    }
+    NSDictionary *liveWeather = lives[0];
+    if(!liveWeather || ![liveWeather isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    return [[WeatherData alloc] initWithDictionary:liveWeather];
 }
 
 - (void)updateWeatherCard:(WeatherData *)weatherData {
@@ -731,4 +795,162 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
                              }];
         }];
 }
+
+/*
+ * ==================== AFNetworking 实际使用示例 ====================
+ * 
+ * 以下是完整的AFNetworking GET请求实现模板
+ * 你可以参考这个模板来完成上面的TODO部分
+ */
+
+/*
+// 示例1: 获取城市adcode的AFNetworking实现
+- (void)exampleGetAdcodeWithAFNetworking:(NSString *)cityName {
+    // 1. 创建AFHTTPSessionManager
+    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+    
+    // 2. 构建URL
+    NSString *urlString = [NSString stringWithFormat:@"https://restapi.amap.com/v3/config/district?keywords=%@&key=%@", cityName, self.apiKey];
+    
+    // 3. 发送GET请求
+    [manager GET:urlString
+      parameters:nil                    // GET参数已在URL中，这里为nil
+         headers:nil                    // 无需自定义请求头
+        progress:nil                    // 小数据请求，无需进度监控
+         success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+             // 4. 成功回调 - responseObject已经是解析好的NSDictionary
+             NSLog(@"API响应: %@", responseObject);
+             
+             // 5. 类型检查
+             if (![responseObject isKindOfClass:[NSDictionary class]]) {
+                 NSLog(@"响应格式错误");
+                 return;
+             }
+             
+             // 6. 提取数据
+             NSDictionary *response = (NSDictionary *)responseObject;
+             NSArray *districts = response[@"districts"];
+             
+             if (!districts || districts.count == 0) {
+                 NSLog(@"未找到城市");
+                 return;
+             }
+             
+             // 7. 获取adcode
+             NSDictionary *firstDistrict = districts[0];
+             NSString *adcode = firstDistrict[@"adcode"];
+             
+             NSLog(@"获取到adcode: %@", adcode);
+             
+             // 8. 继续后续操作...
+         }
+         failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+             // 9. 失败回调
+             NSLog(@"请求失败: %@", error.localizedDescription);
+             
+             // 10. 错误处理
+             dispatch_async(dispatch_get_main_queue(), ^{
+                 // 更新UI显示错误信息
+             });
+         }];
+}
+
+// 示例2: 获取天气数据的AFNetworking实现  
+- (void)exampleGetWeatherWithAFNetworking:(NSString *)adcode {
+    // 1. 创建管理器
+    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+    
+    // 2. 构建URL
+    NSString *urlString = [NSString stringWithFormat:@"https://restapi.amap.com/v3/weather/weatherInfo?city=%@&key=%@", adcode, self.apiKey];
+    
+    // 3. 发送请求
+    [manager GET:urlString
+      parameters:nil
+         headers:nil  
+        progress:nil
+         success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+             // 4. 解析天气数据
+             WeatherData *weatherData = [self parseWeatherDataFromAFNetworking:responseObject];
+             
+             // 5. 更新UI (确保在主线程)
+             dispatch_async(dispatch_get_main_queue(), ^{
+                 if (weatherData) {
+                     [self updateWeatherCard:weatherData];
+                 } else {
+                     // 处理解析失败
+                     NSLog(@"天气数据解析失败");
+                 }
+                 [self hideLoading];  // 隐藏加载指示器
+             });
+         }
+         failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+             // 6. 处理网络错误
+             dispatch_async(dispatch_get_main_queue(), ^{
+                 [self handleNetworkError:error];
+                 [self hideLoading];  // 确保隐藏加载指示器
+             });
+         }];
+}
+
+// 示例3: 带参数的POST请求
+- (void)examplePostRequestWithAFNetworking {
+    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+    
+    // 配置请求序列化器为JSON格式
+    manager.requestSerializer = [AFJSONRequestSerializer serializer];
+    
+    // 请求参数
+    NSDictionary *parameters = @{
+        @"username": @"user123",
+        @"password": @"pass123"
+    };
+    
+    // 自定义请求头
+    NSDictionary *headers = @{
+        @"Authorization": @"Bearer your_token_here",
+        @"Custom-Header": @"custom_value"
+    };
+    
+    [manager POST:@"https://api.example.com/login"
+       parameters:parameters
+          headers:headers
+         progress:nil
+          success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+              NSLog(@"登录成功: %@", responseObject);
+          }
+          failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+              NSLog(@"登录失败: %@", error.localizedDescription);
+          }];
+}
+*/
+
+/*
+ * ==================== 实现任务清单 ====================
+ * 
+ * 请按照以上示例，完成以下方法的AFNetworking实现：
+ * 
+ * 1. getAdcodeForCity:completion: 方法
+ *    - 使用AFHTTPSessionManager发送GET请求
+ *    - 在success回调中提取districts和adcode
+ *    - 在failure回调中调用completion(nil, error)
+ * 
+ * 2. fetchWeatherWithAdcode: 方法  
+ *    - 使用AFHTTPSessionManager发送GET请求
+ *    - 在success回调中调用parseWeatherDataFromAFNetworking
+ *    - 确保UI更新在主线程，调用hideLoading
+ * 
+ * 3. parseWeatherDataFromAFNetworking: 方法
+ *    - 检查responseObject类型和API状态码
+ *    - 提取lives数组和天气数据
+ *    - 返回WeatherData对象或nil
+ * 
+ * 【提示】
+ * - 参考上面的示例代码结构
+ * - 保持原有的错误处理逻辑
+ * - 注意线程安全，UI操作使用dispatch_async
+ * - 测试时注意观察网络请求日志
+ * 
+ * ================================================================
+ */
+
 @end
