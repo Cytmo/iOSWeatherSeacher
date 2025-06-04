@@ -529,7 +529,7 @@ typedef NS_ENUM(NSInteger, WeatherErrorCode) {
     [manager GET:urlString parameters:nil headers:nil progress:nil 
     success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         NSArray *districts = responseObject[@"districts"];
-        if(![districts isKindOfClass:[NSArray class]] || [districts count]==0){
+        if(![districts isKindOfClass:[NSArray class]] || [districts){
             NSError *error = [self createErrorWithCode:WeatherErrorCodeDataParsingError
                                                message:@"无法找到行政区划数据"];
             completion(nil,error);
