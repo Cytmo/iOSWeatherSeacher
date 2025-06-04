@@ -50,14 +50,9 @@ playground.xcworkspace
 
 # CocoaPods
 #
-# We recommend against adding the Pods directory to your .gitignore. However
-# you should judge for yourself, the pros and cons are mentioned at:
-# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
-#
-# Pods/
-#
-# Add this line if you want to avoid checking in source code from the Xcode workspace
-# *.xcworkspace
+# 建议忽略Pods目录，因为可以通过Podfile.lock重新生成
+# 优势：减少仓库大小，避免冲突，加快clone速度
+Pods/
 
 # Carthage
 #
@@ -97,12 +92,14 @@ iOSInjectionProject/
 .Trashes
 ehthumbs.db
 Thumbs.db
+**/.DS_Store
 
 # IDE文件
 .vscode/
 .idea/
 *.swp
 *.swo
+.gundam/
 
 # 临时文件
 *.tmp
@@ -117,6 +114,55 @@ Thumbs.db
 *.a
 *.dylib
 
-# API密钥文件
+# API密钥文件 (重要！绝对不能提交)
 gaodeMapApiKey*
-config/gaodeMapApiKey* 
+config/gaodeMapApiKey*
+**/gaodeMapApiKey*
+*.key
+*.pem
+*.p12
+*.p8
+
+# Xcode生成的文件
+*.moved-aside
+# 不要忽略整个xcworkspace目录，CocoaPods需要它
+# *.xcworkspace/
+# !*.xcworkspace/contents.xcworkspacedata
+# !*.xcworkspace/xcshareddata/
+
+# 代码格式化工具生成的文件
+.clang_complete
+.clang-format-ignore
+
+# 调试文件
+*.gcda
+*.gcno
+
+# 备份文件
+*.orig
+*.backup
+*~.nib
+*.bak
+
+# 文档生成
+docs/
+Documentation/
+
+# 性能分析文件
+*.trace
+*.dtps
+
+# 其他iOS开发相关
+*.mobileprovision
+*.xcarchive
+
+# 测试覆盖率
+*.profdata
+*.profraw
+
+# 网络调试工具
+*.har
+
+# 个人笔记和待办
+TODO.md
+NOTES.md 

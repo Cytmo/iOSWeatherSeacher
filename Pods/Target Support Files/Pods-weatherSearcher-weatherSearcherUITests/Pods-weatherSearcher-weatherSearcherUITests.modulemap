@@ -1,6 +1,0 @@
-framework module Pods_weatherSearcher_weatherSearcherUITests {
-  umbrella header "Pods-weatherSearcher-weatherSearcherUITests-umbrella.h"
-
-  export *
-  module * { export * }
-}
